@@ -1,14 +1,15 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 class PatientBase(BaseModel):
     patient_id: int
     acuity_level: int
     department: str
 
-class PatientOut(PatientBase):
+class Patient(PatientBase):
     id: int
-    arrival_time: datetime | None = None
+    arrival_time: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True # This allows Pydantic to read SQLAlchemy models

@@ -1,22 +1,23 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from . import models, database
-from fastapi import FastAPI
-from app.routers import patients
+from typing import List
+from . import models, schemas, database
 
-# This command creates the tables in PostgreSQL
+# This line is the magic — it creates the tables if they don't exist
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="MediMesh API")
 
-@app.get("/")
-def read_root():
-    return {"message": "MediMesh API is Live", "database": "Tables Created"}
+# Dependency to get the database session
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@app.get("/patients")
-def get_patients(db: Session = Depends(database.get_db)):
-    # This will eventually return the data from your DB
-    return db.query(models.Patient).all()
 
-app = FastAPI(title="MediMesh API")
-app.include_router(patients.router)
+@app.get("/patients/", response_model=List[schemas.Patient])
+def read_patients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    patients = db.query(models.Patient).offset(skip).limit(limit).all()
+    return patients

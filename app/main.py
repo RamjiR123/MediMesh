@@ -16,6 +16,7 @@ def get_db():
     finally:
         db.close()
 
+
 @app.get("/patients/", response_model=List[schemas.Patient])
 def read_patients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     patients = db.query(models.Patient).offset(skip).limit(limit).all()

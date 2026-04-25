@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from uuid import uuid4
+from datetime import datetime, timedelta
+from pydantic import BaseModel
 from app.database import get_db
 from app import models
-from app.schemas import AppointmentCreate, AppointmentUpdate, AppointmentOut
-from datetime import datetime
+from app.schemas import AppointmentCreate, AppointmentUpdate, AppointmentOut, AppointmentTypeEnum
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -81,7 +83,7 @@ def get_upcoming_appointment_count(hours: int = 24, db: Session = Depends(get_db
     now = datetime.utcnow()
     cutoff = datetime.utcfromtimestamp(now.timestamp() + hours * 3600)
     count = db.query(models.Appointment).filter(
-        models.Appointment.appointment_time.between(now, cutoff),
+        models.Appointment.scheduled_time.between(now, cutoff),
         models.Appointment.status == "scheduled"
     ).count()
     return {"upcoming_appointments": count, "time_window_hours": hours}
@@ -94,7 +96,7 @@ def search_appointments_by_date_range(start_date: str, end_date: str, db: Sessio
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")
     appointments = db.query(models.Appointment).filter(
-        models.Appointment.appointment_time.between(start, end)
+        models.Appointment.scheduled_time.between(start, end)
     ).all()
     return appointments
 
@@ -108,8 +110,8 @@ def check_appointment_conflicts(doctor_id: int, appointment_time: str, duration_
     conflicts = db.query(models.Appointment).filter(
         models.Appointment.doctor_id == doctor_id,
         models.Appointment.status == "scheduled",
-        models.Appointment.appointment_time < end_time,
-        models.Appointment.appointment_time >= apt_time
+        models.Appointment.scheduled_time < end_time,
+        models.Appointment.scheduled_time >= apt_time
     ).count()
     return {"has_conflicts": conflicts > 0, "conflicting_appointments": conflicts}
 
@@ -164,10 +166,10 @@ def get_available_slots(doctor_id: int, date: str, slot_duration: int = 30, db: 
     day_end = datetime(query_date.year, query_date.month, query_date.day, 17, 0)
     booked = db.query(models.Appointment).filter(
         models.Appointment.doctor_id == doctor_id,
-        models.Appointment.appointment_time.between(day_start, day_end),
+        models.Appointment.scheduled_time.between(day_start, day_end),
         models.Appointment.status == "scheduled"
     ).all()
-    booked_times = {apt.appointment_time for apt in booked}
+    booked_times = {apt.scheduled_time for apt in booked}
     available_slots = []
     current_time = day_start
     while current_time < day_end:
@@ -175,3 +177,174 @@ def get_available_slots(doctor_id: int, date: str, slot_duration: int = 30, db: 
             available_slots.append(current_time.isoformat())
         current_time = datetime.utcfromtimestamp(current_time.timestamp() + slot_duration * 60)
     return {"doctor_id": doctor_id, "date": date, "available_slots": available_slots}
+
+
+def parse_iso_datetime(value: str, field_name: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name} format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")
+
+
+@router.post("/bulk-import", response_model=dict)
+def bulk_import_appointments(appointments: List[AppointmentCreate], db: Session = Depends(get_db)):
+    imported_ids = []
+    for appointment in appointments:
+        patient = db.query(models.Patient).filter(models.Patient.id == appointment.patient_id).first()
+        if not patient:
+            raise HTTPException(status_code=404, detail=f"Patient {appointment.patient_id} not found")
+        doctor = db.query(models.Doctor).filter(models.Doctor.id == appointment.doctor_id).first()
+        if not doctor:
+            raise HTTPException(status_code=404, detail=f"Doctor {appointment.doctor_id} not found")
+
+        db_appointment = models.Appointment(**appointment.dict(), created_at=datetime.utcnow())
+        db.add(db_appointment)
+        imported_ids.append(appointment.appointment_id)
+
+    db.commit()
+    return {"imported_appointments": len(imported_ids), "appointment_ids": imported_ids}
+
+
+class RecurringAppointmentRequest(BaseModel):
+    patient_id: int
+    doctor_id: int
+    start_time: datetime
+    appointment_type: AppointmentTypeEnum
+    interval_days: int = 7
+    occurrences: int = 4
+    duration_minutes: int = 30
+    notes: Optional[str] = None
+
+
+@router.post("/recurring", response_model=List[AppointmentOut])
+def create_recurring_appointments(request: RecurringAppointmentRequest, db: Session = Depends(get_db)):
+    patient = db.query(models.Patient).filter(models.Patient.id == request.patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    doctor = db.query(models.Doctor).filter(models.Doctor.id == request.doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    appointments = []
+    for index in range(request.occurrences):
+        scheduled_time = request.start_time + timedelta(days=index * request.interval_days)
+        conflict_count = db.query(models.Appointment).filter(
+            models.Appointment.doctor_id == request.doctor_id,
+            models.Appointment.status == "scheduled",
+            models.Appointment.scheduled_time == scheduled_time
+        ).count()
+        if conflict_count:
+            continue
+
+        appointment_id = f"rec-{request.patient_id}-{request.doctor_id}-{uuid4().hex[:8]}-{index}"
+        new_appointment = models.Appointment(
+            appointment_id=appointment_id,
+            patient_id=request.patient_id,
+            doctor_id=request.doctor_id,
+            scheduled_time=scheduled_time,
+            duration_minutes=request.duration_minutes,
+            status="scheduled",
+            appointment_type=request.appointment_type,
+            notes=request.notes,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_appointment)
+        appointments.append(new_appointment)
+
+    if not appointments:
+        raise HTTPException(status_code=400, detail="No recurring appointments could be scheduled due to conflicts")
+
+    db.commit()
+    for appointment in appointments:
+        db.refresh(appointment)
+    return appointments
+
+
+@router.get("/report/doctor/{doctor_id}", response_model=dict)
+def get_doctor_report(doctor_id: int, date: Optional[str] = None, db: Session = Depends(get_db)):
+    doctor = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    if date:
+        target_date = parse_iso_datetime(date, "date").date()
+    else:
+        target_date = datetime.utcnow().date()
+
+    start = datetime(target_date.year, target_date.month, target_date.day, 0, 0)
+    end = start + timedelta(days=1)
+
+    appointments = db.query(models.Appointment).filter(
+        models.Appointment.doctor_id == doctor_id,
+        models.Appointment.scheduled_time.between(start, end)
+    ).all()
+
+    status_breakdown = {
+        "scheduled": 0,
+        "completed": 0,
+        "cancelled": 0,
+        "no-show": 0
+    }
+    next_slot = None
+    now = datetime.utcnow()
+    for apt in appointments:
+        status_breakdown[apt.status] = status_breakdown.get(apt.status, 0) + 1
+        if apt.status == "scheduled" and apt.scheduled_time >= now:
+            if next_slot is None or apt.scheduled_time < next_slot:
+                next_slot = apt.scheduled_time
+
+    return {
+        "doctor_id": doctor_id,
+        "date": target_date.isoformat(),
+        "total_appointments": len(appointments),
+        "status_breakdown": status_breakdown,
+        "next_available_slot": next_slot.isoformat() if next_slot else None
+    }
+
+
+@router.get("/report/patient/{patient_id}", response_model=dict)
+def get_patient_report(patient_id: int, db: Session = Depends(get_db)):
+    patient = db.query(models.Patient).filter(models.Patient.patient_id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    upcoming = db.query(models.Appointment).filter(
+        models.Appointment.patient_id == patient.id,
+        models.Appointment.scheduled_time >= datetime.utcnow(),
+        models.Appointment.status == "scheduled"
+    ).order_by(models.Appointment.scheduled_time).all()
+
+    return {
+        "patient_id": patient_id,
+        "upcoming_appointments": len(upcoming),
+        "next_appointment": upcoming[0].scheduled_time.isoformat() if upcoming else None
+    }
+
+
+@router.get("/report/date/{date}", response_model=dict)
+def get_daily_appointment_report(date: str, db: Session = Depends(get_db)):
+    target_date = parse_iso_datetime(date, "date").date()
+    start = datetime(target_date.year, target_date.month, target_date.day, 0, 0)
+    end = start + timedelta(days=1)
+
+    appointments = db.query(models.Appointment).filter(
+        models.Appointment.scheduled_time.between(start, end)
+    ).all()
+
+    by_status = {}
+    by_doctor = {}
+    for apt in appointments:
+        by_status[apt.status] = by_status.get(apt.status, 0) + 1
+        by_doctor[apt.doctor_id] = by_doctor.get(apt.doctor_id, 0) + 1
+
+    busiest_doctor = None
+    if by_doctor:
+        busiest_doctor = max(by_doctor, key=by_doctor.get)
+
+    return {
+        "date": target_date.isoformat(),
+        "total_appointments": len(appointments),
+        "by_status": by_status,
+        "busiest_doctor_id": busiest_doctor,
+        "appointments_per_doctor": by_doctor
+    }

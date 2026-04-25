@@ -51,7 +51,7 @@ MediMesh is under active development. The current phase focuses on building a ro
 - Set up backend, database, and synthetic data generation  
 - Build initial API endpoints  
 
-### Phase 2 — Predictive Modeling (in progress)
+### Phase 2 — Predictive Modeling
 - Train baseline forecasting models  
 - Validate predictions on synthetic and public datasets  
 - Integrate advanced models for improved accuracy  

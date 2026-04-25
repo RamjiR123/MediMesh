@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 from app.database import get_db
 from app import models
 from app.schemas import DoctorCreate, DoctorUpdate, DoctorOut
@@ -46,6 +47,51 @@ def delete_doctor(doctor_id: str, db: Session = Depends(get_db)):
     db.delete(doctor)
     db.commit()
     return {"message": "Doctor deleted successfully"}
+
+@router.get("/search", response_model=List[DoctorOut])
+def search_doctors(
+    department: Optional[str] = None,
+    specialty: Optional[str] = None,
+    is_available: Optional[bool] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Doctor)
+    if department:
+        query = query.filter(models.Doctor.department == department)
+    if specialty:
+        query = query.filter(models.Doctor.specialty == specialty)
+    if is_available is not None:
+        query = query.filter(models.Doctor.is_available == is_available)
+    return query.all()
+
+@router.get("/on-shift/", response_model=List[DoctorOut])
+def list_on_shift_doctors(db: Session = Depends(get_db)):
+    now = datetime.utcnow()
+    doctors = db.query(models.Doctor).filter(
+        models.Doctor.shift_start <= now,
+        models.Doctor.shift_end >= now,
+        models.Doctor.is_available == True
+    ).all()
+    return doctors
+
+@router.get("/summary", response_model=dict)
+def doctor_summary(db: Session = Depends(get_db)):
+    total = db.query(models.Doctor).count()
+    available = db.query(models.Doctor).filter(models.Doctor.is_available == True).count()
+    by_department = {
+        row.department: db.query(models.Doctor).filter(models.Doctor.department == row.department).count()
+        for row in db.query(models.Doctor.department).distinct().all()
+    }
+    by_specialty = {
+        row.specialty: db.query(models.Doctor).filter(models.Doctor.specialty == row.specialty).count()
+        for row in db.query(models.Doctor.specialty).distinct().all()
+    }
+    return {
+        "total_doctors": total,
+        "available_doctors": available,
+        "by_department": by_department,
+        "by_specialty": by_specialty
+    }
 
 @router.get("/available/", response_model=List[DoctorOut])
 def list_available_doctors(db: Session = Depends(get_db)):

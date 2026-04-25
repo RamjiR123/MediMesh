@@ -22,6 +22,7 @@ class ERWaitTimePredictor:
         )
         self.scaler = StandardScaler()
         self.is_trained = False
+        self.train_metrics = {}
 
     def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Preprocess patient data for modeling"""
@@ -76,6 +77,11 @@ class ERWaitTimePredictor:
             y_pred = self.model.predict(X_test_scaled)
             mae = mean_absolute_error(y_test, y_pred)
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+            self.train_metrics = {
+                "trained_samples": len(df_processed),
+                "mae": float(mae),
+                "rmse": float(rmse)
+            }
 
             logger.info(f"Model trained successfully - MAE: {mae:.2f} min, RMSE: {rmse:.2f} min")
 
@@ -117,6 +123,7 @@ class BedOccupancyPredictor:
     def __init__(self):
         self.hourly_patterns = {}
         self.is_trained = False
+        self.train_samples = 0
 
     def train(self, df: pd.DataFrame):
         """Train bed occupancy patterns"""
@@ -138,6 +145,7 @@ class BedOccupancyPredictor:
 
             self.hourly_patterns = dict(zip(hourly_stats['hour'], hourly_stats['occupancy_rate']))
             self.is_trained = True
+            self.train_samples = len(df_processed)
 
             logger.info("Bed occupancy model trained successfully")
 
@@ -176,6 +184,7 @@ class PredictiveAnalyticsService:
         self.er_predictor = ERWaitTimePredictor()
         self.bed_predictor = BedOccupancyPredictor()
         self.is_initialized = False
+        self.training_summary = {}
 
     def initialize_models(self, patient_data: pd.DataFrame):
         """Initialize and train prediction models"""
@@ -184,6 +193,12 @@ class PredictiveAnalyticsService:
 
             self.er_predictor.train(patient_data)
             self.bed_predictor.train(patient_data)
+            self.training_summary = {
+                "er_wait_time": self.er_predictor.train_metrics,
+                "bed_occupancy": {
+                    "trained_samples": self.bed_predictor.train_samples
+                }
+            }
 
             self.is_initialized = True
             logger.info("Predictive models initialized successfully")
@@ -191,6 +206,17 @@ class PredictiveAnalyticsService:
         except Exception as e:
             logger.error(f"Failed to initialize models: {e}")
             raise
+
+    def retrain_models(self, patient_data: pd.DataFrame):
+        """Retrain prediction models with fresh patient history"""
+        self.is_initialized = False
+        self.initialize_models(patient_data)
+        return self.training_summary
+
+    def get_training_summary(self) -> Dict[str, object]:
+        if not self.is_initialized:
+            raise ValueError("Models not initialized")
+        return self.training_summary
 
     def predict_er_wait_time(self, patient_data: pd.DataFrame) -> Dict[str, float]:
         """Predict ER wait time"""

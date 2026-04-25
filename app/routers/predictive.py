@@ -40,6 +40,12 @@ class OccupancyForecastResponse(BaseModel):
     predicted_occupancy: List[float]
     timestamps: List[str]
 
+class PredictiveSummaryResponse(BaseModel):
+    initialized: bool
+    trained_models: List[str]
+    er_wait_time_metrics: dict
+    bed_occupancy_metrics: dict
+
 @router.post("/init", response_model=PredictInitResponse)
 def initialize_predictive_models(db: Session = Depends(get_db)):
     """Train predictive models using existing patient data"""
@@ -64,6 +70,47 @@ def initialize_predictive_models(db: Session = Depends(get_db)):
         success=True,
         trained_models=["er_wait_time", "bed_occupancy"],
         message="Predictive models trained successfully using current patient history"
+    )
+
+@router.post("/retrain", response_model=PredictInitResponse)
+def retrain_predictive_models(db: Session = Depends(get_db)):
+    """Retrain predictive models using the latest patient history"""
+    patients = db.query(models.Patient).all()
+    if not patients:
+        raise HTTPException(status_code=404, detail="No patients available for model training")
+
+    patient_rows = [
+        {
+            "patient_id": patient.patient_id,
+            "arrival_time": patient.arrival_time,
+            "acuity_level": patient.acuity_level,
+            "department": patient.department,
+        }
+        for patient in patients
+    ]
+
+    df = pd.DataFrame(patient_rows)
+    predictive_service.retrain_models(df)
+
+    return PredictInitResponse(
+        success=True,
+        trained_models=["er_wait_time", "bed_occupancy"],
+        message="Predictive models retrained successfully with current patient history"
+    )
+
+@router.get("/training-summary", response_model=PredictiveSummaryResponse)
+def get_predictive_training_summary():
+    """Return a summary of the current trained predictive models"""
+    try:
+        summary = predictive_service.get_training_summary()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return PredictiveSummaryResponse(
+        initialized=predictive_service.is_initialized,
+        trained_models=["er_wait_time", "bed_occupancy"],
+        er_wait_time_metrics=summary.get("er_wait_time", {}),
+        bed_occupancy_metrics=summary.get("bed_occupancy", {})
     )
 
 @router.post("/er-wait", response_model=PredictERResponse)

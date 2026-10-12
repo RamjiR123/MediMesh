@@ -6,6 +6,7 @@ import psycopg2
 import os
 from app.database import get_db
 from app import models
+from app.operational_alerts import build_operational_alerts
 
 router = APIRouter(prefix="/health", tags=["Health Checks"])
 
@@ -84,6 +85,11 @@ def system_metrics(db: Session = Depends(get_db)):
                 "recent_patients_24h": recent_patients,
                 "recent_appointments_24h": recent_appointments
             },
+            "alerts": build_operational_alerts({
+                "bed_occupancy_rate": round(bed_occupancy_rate, 2),
+                "total_doctors": doctor_count,
+                "doctor_availability_rate": round(doctor_availability_rate, 2),
+            }),
             "timestamp": datetime.utcnow()
         }
     except Exception as e:

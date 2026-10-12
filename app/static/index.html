@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediMesh Demo</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>MediMesh Demo</h1>
+      <p>FastAPI hospital operations demo with patient, doctor, bed, appointment, and predictive insights.</p>
+    </div>
+    <nav>
+      <button onclick="showSection('overview')">Overview</button>
+      <button onclick="showSection('patients')">Patients</button>
+      <button onclick="showSection('doctors')">Doctors</button>
+      <button onclick="showSection('beds')">Beds</button>
+      <button onclick="showSection('appointments')">Appointments</button>
+      <button onclick="showSection('predictive')">Predictive</button>
+      <button onclick="showSection('admin')">Admin</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="overview" class="panel active">
+      <h2>System Overview</h2>
+      <div class="grid">
+        <div class="card" id="overview-metrics">Loading dashboard metrics...</div>
+        <div class="card" id="overview-status">Loading health status...</div>
+      </div>
+      <div class="notes">
+        <p>Use the tabs to manage hospital data and run predictive models.</p>
+      </div>
+    </section>
+
+    <section id="patients" class="panel">
+      <h2>Patients</h2>
+      <div class="form-grid">
+        <div class="card">
+          <h3>Create Patient</h3>
+          <label>Patient ID<input id="patient-id" type="number" /></label>
+          <label>Acuity Level<select id="patient-acuity"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label>Department<select id="patient-department"><option value="ER">ER</option><option value="ICU">ICU</option><option value="General">General</option></select></label>
+          <label>Arrival Time<input id="patient-arrival" type="datetime-local" /></label>
+          <button onclick="createPatient()">Create Patient</button>
+          <div class="status" id="patient-create-status"></div>
+        </div>
+        <div class="card full-width">
+          <h3>Patient List</h3>
+          <button onclick="loadPatients()">Refresh Patients</button>
+          <div id="patients-table">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="doctors" class="panel">
+      <h2>Doctors</h2>
+      <div class="form-grid">
+        <div class="card">
+          <h3>Create Doctor</h3>
+          <label>Doctor ID<input id="doctor-id" type="text" /></label>
+          <label>Name<input id="doctor-name" type="text" /></label>
+          <label>Specialty<input id="doctor-specialty" type="text" /></label>
+          <label>Department<select id="doctor-department"><option value="ER">ER</option><option value="ICU">ICU</option><option value="General">General</option></select></label>
+          <label>Available<select id="doctor-available"><option value="true">Yes</option><option value="false">No</option></select></label>
+          <button onclick="createDoctor()">Create Doctor</button>
+          <div class="status" id="doctor-create-status"></div>
+        </div>
+        <div class="card full-width">
+          <h3>Doctor List</h3>
+          <button onclick="loadDoctors()">Refresh Doctors</button>
+          <div id="doctors-table">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="beds" class="panel">
+      <h2>Beds</h2>
+      <div class="form-grid">
+        <div class="card">
+          <h3>Create Bed</h3>
+          <label>Bed Number<input id="bed-number" type="text" /></label>
+          <label>Department<select id="bed-department"><option value="ER">ER</option><option value="ICU">ICU</option><option value="General">General</option></select></label>
+          <label>Room Type<input id="bed-room-type" type="text" value="ICU" /></label>
+          <button onclick="createBed()">Create Bed</button>
+          <div class="status" id="bed-create-status"></div>
+        </div>
+        <div class="card full-width">
+          <h3>Bed List</h3>
+          <button onclick="loadBeds()">Refresh Beds</button>
+          <div id="beds-table">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="appointments" class="panel">
+      <h2>Appointments</h2>
+      <div class="form-grid">
+        <div class="card">
+          <h3>Create Appointment</h3>
+          <label>Appointment ID<input id="appointment-id" type="text" value="apt-" /></label>
+          <label>Patient DB ID<input id="appointment-patient-id" type="number" /></label>
+          <label>Doctor DB ID<input id="appointment-doctor-id" type="number" /></label>
+          <label>Scheduled Time<input id="appointment-time" type="datetime-local" /></label>
+          <label>Duration (minutes)<input id="appointment-duration" type="number" value="30" /></label>
+          <label>Type<select id="appointment-type"><option value="consultation">Consultation</option><option value="follow-up">Follow-up</option><option value="procedure">Procedure</option><option value="emergency">Emergency</option></select></label>
+          <button onclick="createAppointment()">Create Appointment</button>
+          <div class="status" id="appointment-create-status"></div>
+        </div>
+        <div class="card full-width">
+          <h3>Appointment List</h3>
+          <button onclick="loadAppointments()">Refresh Appointments</button>
+          <div id="appointments-table">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="admin" class="panel">
+      <h2>Admin / Demo Data</h2>
+      <div class="form-grid">
+        <div class="card">
+          <h3>Dataset Controls</h3>
+          <p>Reset demo data and seed a large-scale hospital dataset for interactive testing.</p>
+          <button onclick="resetData()">Reset All Records</button>
+          <button onclick="seedLargeDemo()">Seed Large Demo Dataset</button>
+          <div class="status" id="admin-action-status"></div>
+        </div>
+        <div class="card full-width">
+          <h3>Current Dataset Summary</h3>
+          <button onclick="loadAdminSummary()">Refresh Summary</button>
+          <div id="admin-summary">Loading summary...</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="predictive" class="panel">
+      <h2>Predictive Analytics</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Model Controls</h3>
+          <button onclick="initializeModels()">Initialize Models</button>
+          <button onclick="reloadPredictiveStatus()">Refresh Status</button>
+          <div class="status" id="predictive-status">Loading predictive status...</div>
+        </div>
+        <div class="card">
+          <h3>ER Wait Time Prediction</h3>
+          <label>Department<select id="predict-department"><option value="ER">ER</option><option value="ICU">ICU</option><option value="General">General</option></select></label>
+          <label>Acuity Level<select id="predict-acuity"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label>Arrival Time<input id="predict-arrival" type="datetime-local" /></label>
+          <button onclick="predictERWait()">Predict ER Wait</button>
+          <div class="status" id="predictive-result"></div>
+        </div>
+      </div>
+      <div class="card full-width">
+        <h3>Bed Occupancy Forecast</h3>
+        <label>Hours Ahead<input id="forecast-hours" type="number" value="24" min="1" max="72" /></label>
+        <button onclick="predictBedOccupancy()">Forecast Bed Occupancy</button>
+        <div id="bed-forecast"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Demo frontend for MediMesh. Use the FastAPI backend and the current database to try sample hospital workflows.</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -7,19 +7,29 @@ from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tim@localhost/medimesh")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    sqlite_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "medimesh.db"))
+    DATABASE_URL = f"sqlite:///{sqlite_path}"
 POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
 MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
 
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=POOL_SIZE,
-    max_overflow=MAX_OVERFLOW,
-    pool_timeout=30,
-    pool_recycle=3600,
-    echo=bool(os.getenv("DB_ECHO", False))
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=bool(os.getenv("DB_ECHO", False)),
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=POOL_SIZE,
+        max_overflow=MAX_OVERFLOW,
+        pool_timeout=30,
+        pool_recycle=3600,
+        echo=bool(os.getenv("DB_ECHO", False)),
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

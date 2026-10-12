@@ -50,12 +50,13 @@ class ERWaitTimePredictor:
             df_processed = self.preprocess_data(df)
 
             # Create synthetic target (wait time in minutes)
+            # Higher-acuity patients are triaged faster, so their expected wait is shorter.
             np.random.seed(42)
             df_processed['wait_time'] = (
                 np.random.exponential(scale=20, size=len(df_processed)) +
-                df_processed['acuity_level'] * 15 +
+                60 - df_processed['acuity_level'] * 10 +
                 df_processed['hour'].apply(lambda x: 10 if 18 <= x <= 22 else 0)  # Peak hours
-            )
+            ).clip(lower=1)
 
             # Features for prediction
             feature_cols = ['acuity_level', 'hour', 'day_of_week', 'is_weekend', 'department_encoded']

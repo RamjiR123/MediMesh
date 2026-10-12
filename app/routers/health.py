@@ -78,6 +78,7 @@ def system_metrics(db: Session = Depends(get_db)):
                 "total_patients": patient_count,
                 "total_doctors": doctor_count,
                 "total_beds": bed_count,
+                "occupied_beds": occupied_beds,
                 "total_appointments": appointment_count,
                 "total_staff": staff_count,
                 "bed_occupancy_rate": round(bed_occupancy_rate, 2),

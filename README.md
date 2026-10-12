@@ -22,12 +22,14 @@ By providing a transparent, open-source toolset, MediMesh bridges the gap betwee
 ## 🚧 Current Development Focus  
 MediMesh is under active development. The current phase focuses on building a robust foundation for long-term growth while delivering a functional end-to-end prototype.
 
-### Data & Backend  
-- FastAPI backend with PostgreSQL for real-time data ingestion  
-- Synthetic data generation engine for ER visits, bed usage, and staffing patterns  
-- Clean, modular database schema for hospital workflow data  
+### Data & Backend
+- FastAPI backend with local SQLite fallback for quick demo usage
+- Synthetic data generation engine for ER visits, bed usage, and staffing patterns
+- Clean, modular database schema for hospital workflow data
 
-### Modeling  
+> Tip: Run locally with SQLite by leaving `DATABASE_URL` unset, or set `DATABASE_URL="sqlite:///./medimesh.db"`.
+
+### Modeling
 - Baseline forecasting models using Scikit-learn and Prophet  
 - Advanced models (XGBoost) for improved accuracy and latency  
 - Model explainability via SHAP  

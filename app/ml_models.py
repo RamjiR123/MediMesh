@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 class ERWaitTimePredictor:
     """Predict ER wait times using Random Forest regression"""
 
+    feature_columns = [
+        "acuity_level", "hour_sin", "hour_cos", "day_sin", "day_cos",
+        "department_er", "department_icu", "department_general", "department_other",
+    ]
+
     def __init__(self):
         self.model = RandomForestRegressor(
             n_estimators=100,
@@ -28,16 +33,23 @@ class ERWaitTimePredictor:
         """Preprocess patient data for modeling"""
         df_processed = df.copy()
 
-        # Extract time features
-        if 'arrival_time' in df_processed.columns:
-            df_processed['arrival_time'] = pd.to_datetime(df_processed['arrival_time'])
-            df_processed['hour'] = df_processed['arrival_time'].dt.hour
-            df_processed['day_of_week'] = df_processed['arrival_time'].dt.dayofweek
-            df_processed['is_weekend'] = df_processed['day_of_week'].isin([5, 6]).astype(int)
+        arrival_times = df_processed.get("arrival_time", pd.Series(index=df_processed.index, dtype="object"))
+        arrival_times = pd.to_datetime(arrival_times, errors="coerce", utc=True)
+        arrival_times = arrival_times.fillna(pd.Timestamp.now(tz="UTC"))
+        hour = arrival_times.dt.hour + arrival_times.dt.minute / 60
+        day = arrival_times.dt.dayofweek
+        df_processed["hour"] = hour
+        df_processed["hour_sin"] = np.sin(2 * np.pi * hour / 24)
+        df_processed["hour_cos"] = np.cos(2 * np.pi * hour / 24)
+        df_processed["day_sin"] = np.sin(2 * np.pi * day / 7)
+        df_processed["day_cos"] = np.cos(2 * np.pi * day / 7)
 
-        # Encode department
-        dept_mapping = {'ER': 0, 'ICU': 1, 'General': 2}
-        df_processed['department_encoded'] = df_processed['department'].map(dept_mapping).fillna(-1)
+        departments = df_processed.get("department", pd.Series("", index=df_processed.index))
+        normalized = departments.fillna("").astype(str).str.strip().str.casefold()
+        for name in ("er", "icu", "general"):
+            df_processed[f"department_{name}"] = normalized.eq(name).astype(int)
+        df_processed["department_other"] = ~normalized.isin(["er", "icu", "general"])
+        df_processed["department_other"] = df_processed["department_other"].astype(int)
 
         return df_processed
 
@@ -49,19 +61,22 @@ class ERWaitTimePredictor:
             # Preprocess data
             df_processed = self.preprocess_data(df)
 
-            # Create synthetic target (wait time in minutes)
-            # Higher-acuity patients are triaged faster, so their expected wait is shorter.
-            np.random.seed(42)
-            df_processed['wait_time'] = (
-                np.random.exponential(scale=20, size=len(df_processed)) +
-                60 - df_processed['acuity_level'] * 10 +
-                df_processed['hour'].apply(lambda x: 10 if 18 <= x <= 22 else 0)  # Peak hours
-            ).clip(lower=1)
+            if "wait_time_minutes" in df_processed:
+                target = pd.to_numeric(df_processed["wait_time_minutes"], errors="coerce")
+                valid = target.notna() & np.isfinite(target) & target.gt(0)
+                df_processed = df_processed.loc[valid]
+                y = target.loc[valid]
+                self.train_metrics["target_source"] = "observed"
+            else:
+                random_noise = np.random.default_rng(42).exponential(scale=20, size=len(df_processed))
+                peak_bonus = df_processed["hour"].between(18, 22).astype(int) * 10
+                y = (random_noise + 60 - df_processed["acuity_level"] * 10 + peak_bonus).clip(lower=1)
+                self.train_metrics["target_source"] = "synthetic"
 
-            # Features for prediction
-            feature_cols = ['acuity_level', 'hour', 'day_of_week', 'is_weekend', 'department_encoded']
-            X = df_processed[feature_cols]
-            y = df_processed['wait_time']
+            if len(df_processed) < 2:
+                raise ValueError("At least two valid wait-time samples are required")
+
+            X = df_processed[self.feature_columns]
 
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -78,11 +93,11 @@ class ERWaitTimePredictor:
             y_pred = self.model.predict(X_test_scaled)
             mae = mean_absolute_error(y_test, y_pred)
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            self.train_metrics = {
+            self.train_metrics.update({
                 "trained_samples": len(df_processed),
                 "mae": float(mae),
                 "rmse": float(rmse)
-            }
+            })
 
             logger.info(f"Model trained successfully - MAE: {mae:.2f} min, RMSE: {rmse:.2f} min")
 
@@ -99,9 +114,7 @@ class ERWaitTimePredictor:
             # Preprocess input data
             df_processed = self.preprocess_data(patient_data)
 
-            # Prepare features
-            feature_cols = ['acuity_level', 'hour', 'day_of_week', 'is_weekend', 'department_encoded']
-            X = df_processed[feature_cols]
+            X = df_processed[self.feature_columns]
             X_scaled = self.scaler.transform(X)
 
             # Make predictions

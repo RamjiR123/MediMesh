@@ -145,6 +145,41 @@ footer {
   border-radius: 14px;
 }
 
+.alert-panel h3 {
+  margin-top: 0;
+}
+
+.alert-items {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.alert-item {
+  border-left: 4px solid;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.alert-item.critical {
+  border-color: #b91c1c;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.alert-item.warning {
+  border-color: #b45309;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.alert-empty {
+  margin-bottom: 0;
+  color: #475569;
+}
+
 @media (max-width: 760px) {
   header,
   main,

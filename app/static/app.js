@@ -32,6 +32,33 @@ function statusMessage(containerId, message, isError = false) {
   }
 }
 
+function renderOperationalAlerts(alerts = []) {
+  const container = document.getElementById('overview-alerts');
+  container.replaceChildren();
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Operational Alerts';
+  container.append(heading);
+
+  if (!alerts.length) {
+    const message = document.createElement('p');
+    message.className = 'alert-empty';
+    message.textContent = 'No active alerts';
+    container.append(message);
+    return;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'alert-items';
+  alerts.forEach(alert => {
+    const item = document.createElement('li');
+    item.className = `alert-item ${alert.level === 'critical' ? 'critical' : 'warning'}`;
+    item.textContent = alert.message;
+    list.append(item);
+  });
+  container.append(list);
+}
+
 async function loadOverview() {
   try {
     const metrics = await fetchJson('/health/metrics');
@@ -45,8 +72,10 @@ async function loadOverview() {
       <p><strong>Appointments:</strong> ${metrics.metrics.total_appointments}</p>
       <p><strong>Doctor Availability:</strong> ${metrics.metrics.doctor_availability_rate}%</p>
     `;
+    renderOperationalAlerts(metrics.alerts);
   } catch (error) {
     document.getElementById('overview-metrics').textContent = `Unable to load metrics: ${error.message}`;
+    renderOperationalAlerts();
   }
 
   try {

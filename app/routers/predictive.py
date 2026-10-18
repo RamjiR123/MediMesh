@@ -7,6 +7,7 @@ import pandas as pd
 from app.database import get_db
 from app import models
 from app.ml_models import predictive_service
+from app.staffing_forecast import forecast_staffing_demand
 
 router = APIRouter(prefix="/predictive", tags=["Predictive"])
 
@@ -39,6 +40,13 @@ class PredictERResponse(BaseModel):
 class OccupancyForecastResponse(BaseModel):
     predicted_occupancy: List[float]
     timestamps: List[str]
+
+class StaffingForecastResponse(BaseModel):
+    timestamps: List[str]
+    predicted_patient_arrivals: List[float]
+    recommended_staff: List[int]
+    department: Optional[str]
+    patients_per_staff: int
 
 class PredictiveSummaryResponse(BaseModel):
     initialized: bool
@@ -133,6 +141,20 @@ def predict_bed_occupancy(hours_ahead: int = 24):
 
     forecast = predictive_service.predict_bed_occupancy(hours_ahead)
     return OccupancyForecastResponse(**forecast)
+
+@router.get("/staffing-demand", response_model=StaffingForecastResponse)
+def predict_staffing_demand(hours_ahead: int = 24, department: Optional[str] = None,
+                            patients_per_staff: int = 4, db: Session = Depends(get_db)):
+    """Estimate hourly staffing demand from recent patient arrivals."""
+    rows = db.query(models.Patient.arrival_time, models.Patient.department).all()
+    try:
+        forecast = forecast_staffing_demand(
+            [dict(arrival_time=row[0], department=row[1]) for row in rows],
+            hours_ahead, patients_per_staff, department,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return StaffingForecastResponse(**forecast)
 
 @router.get("/status")
 def predictive_status() -> Dict[str, object]:

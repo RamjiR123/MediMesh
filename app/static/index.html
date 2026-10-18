@@ -160,6 +160,17 @@
         <button onclick="predictBedOccupancy()">Forecast Bed Occupancy</button>
         <div id="bed-forecast"></div>
       </div>
+      <div class="card full-width">
+        <h3>Staffing Demand Forecast</h3>
+        <div class="forecast-controls">
+          <label>Hours Ahead<input id="staffing-hours" type="number" value="24" min="1" max="72" /></label>
+          <label>Department<select id="staffing-department"><option value="">All departments</option><option>ER</option><option>ICU</option><option>General</option></select></label>
+          <label>Patients per staff per hour<input id="patients-per-staff" type="number" value="4" min="1" max="20" /></label>
+        </div>
+        <button onclick="predictStaffingDemand()">Forecast Staffing Demand</button>
+        <p class="forecast-note">Planning estimate only; actual staffing needs also depend on acuity, shift coverage, and service mix.</p>
+        <div id="staffing-forecast" class="forecast-table-wrap" aria-live="polite"></div>
+      </div>
     </section>
   </main>
 

@@ -180,6 +180,28 @@ footer {
   color: #475569;
 }
 
+.forecast-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.forecast-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.forecast-table-wrap table {
+  min-width: 420px;
+}
+
+.forecast-note {
+  margin: 12px 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 760px) {
   header,
   main,

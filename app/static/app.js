@@ -243,6 +243,32 @@ async function predictBedOccupancy() {
   }
 }
 
+async function predictStaffingDemand() {
+  const container = document.getElementById('staffing-forecast');
+  try {
+    const params = new URLSearchParams({
+      hours_ahead: document.getElementById('staffing-hours').value,
+      patients_per_staff: document.getElementById('patients-per-staff').value,
+    });
+    const department = document.getElementById('staffing-department').value;
+    if (department) params.set('department', department);
+    const forecast = await fetchJson(`/predictive/staffing-demand?${params}`);
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Hour</th><th>Expected arrivals</th><th>Estimated staff</th></tr></thead>';
+    const body = table.createTBody();
+    forecast.timestamps.forEach((timestamp, index) => {
+      const row = body.insertRow();
+      [new Date(timestamp).toLocaleString(), forecast.predicted_patient_arrivals[index],
+        forecast.recommended_staff[index]].forEach(value => {
+        row.insertCell().textContent = value;
+      });
+    });
+    container.replaceChildren(table);
+  } catch (error) {
+    container.textContent = `Unable to forecast staffing: ${error.message}`;
+  }
+}
+
 async function createPatient() {
   try {
     const payload = {

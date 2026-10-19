@@ -84,4 +84,34 @@ The evolving demo will allow hospital administrators to:
 - Understand model reasoning through interpretability tools  
 - Interact with a cloud-deployable analytics platform  
 
+## Predictive Scenario Checks
+
+Run the deterministic unit and simulation scenarios from the repository root:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+The hospital scenarios use fixed synthetic arrivals on matching weekdays. They check a quiet Sunday, an ER peak, separate ER and ICU histories, and a hospital-wide total. Expected arrival and staffing estimates are asserted, so a change in the forecast behavior is visible in test output.
+
+These checks validate internal consistency on controlled data; they are not an estimate of real hospital accuracy. Current patient records do not include measured wait times, so ER wait-model evaluation uses synthetic fallback labels until observed `wait_time_minutes` data is available. Staffing estimates also depend on the configured patients-per-staff ratio and should not be used as clinical or shift-roster guidance.
+
+### Scenario Results
+| Scenario | Arrivals / hour | Estimated staff |
+| --- | ---: | ---: |
+| Quiet ER | 1 | 1 |
+| Peak ER | 8 | 2 |
+| Combined ER and ICU | 10 | 3 |
+
+Run only the hospital scenarios with:
+
+```powershell
+python -m unittest discover -s tests -p test_hospital_scenarios.py -v
+```
+
+For real-world evaluation, collect timestamped arrivals and measured wait times before treating any model score as operational evidence.
+
+Reserve a later time period as a holdout set to avoid evaluating against training history.
+Compare predictions with observed outcomes using MAE and RMSE, and document the dataset period.
+
 ---

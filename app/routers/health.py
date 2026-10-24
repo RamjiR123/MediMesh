@@ -90,6 +90,7 @@ def system_metrics(db: Session = Depends(get_db)):
                 "bed_occupancy_rate": round(bed_occupancy_rate, 2),
                 "total_doctors": doctor_count,
                 "doctor_availability_rate": round(doctor_availability_rate, 2),
+                "recent_patients_24h": recent_patients,
             }),
             "timestamp": datetime.utcnow()
         }

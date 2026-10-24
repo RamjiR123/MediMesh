@@ -1,5 +1,7 @@
 BED_OCCUPANCY_ALERT_THRESHOLD = 90.0
 DOCTOR_AVAILABILITY_ALERT_THRESHOLD = 10.0
+RECENT_PATIENT_VOLUME_ALERT_THRESHOLD = 50
+RECENT_PATIENT_VOLUME_CRITICAL_THRESHOLD = 100
 
 
 def build_operational_alerts(metrics: dict) -> list[dict]:
@@ -21,5 +23,15 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "metric": "doctor_availability_rate",
             "value": availability,
             "message": f"Doctor availability is {availability:.1f}%, at or below the 10% threshold.",
+        })
+
+    recent_patients = metrics.get("recent_patients_24h", 0)
+    if recent_patients >= RECENT_PATIENT_VOLUME_ALERT_THRESHOLD:
+        level = "critical" if recent_patients >= RECENT_PATIENT_VOLUME_CRITICAL_THRESHOLD else "warning"
+        alerts.append({
+            "level": level,
+            "metric": "recent_patients_24h",
+            "value": recent_patients,
+            "message": f"Patient volume is {recent_patients} arrivals in the last 24 hours.",
         })
     return alerts

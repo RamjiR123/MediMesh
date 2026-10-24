@@ -96,6 +96,10 @@ The hospital scenarios use fixed synthetic arrivals on matching weekdays. They c
 
 These checks validate internal consistency on controlled data; they are not an estimate of real hospital accuracy. Current patient records do not include measured wait times, so ER wait-model evaluation uses synthetic fallback labels until observed `wait_time_minutes` data is available. Staffing estimates also depend on the configured patients-per-staff ratio and should not be used as clinical or shift-roster guidance.
 
+## Operational Alert Thresholds
+
+The health metrics response includes warnings for bed occupancy at 90% or above, doctor availability at 10% or below, and 50 or more patient arrivals in the preceding 24 hours. Patient volume escalates to critical at 100 arrivals. These are initial demo settings, not hospital-specific safety standards; tune thresholds to local capacity and review alert frequency against observed operations.
+
 ### Scenario Results
 | Scenario | Arrivals / hour | Estimated staff |
 | --- | ---: | ---: |

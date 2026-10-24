@@ -96,7 +96,14 @@ class ERWaitTimePredictor:
             self.train_metrics.update({
                 "trained_samples": len(df_processed),
                 "mae": float(mae),
-                "rmse": float(rmse)
+                "rmse": float(rmse),
+                "feature_importance": [
+                    {"feature": feature, "importance": float(score)}
+                    for feature, score in sorted(
+                        zip(self.feature_columns, self.model.feature_importances_),
+                        key=lambda item: item[1], reverse=True,
+                    )
+                ],
             })
 
             logger.info(f"Model trained successfully - MAE: {mae:.2f} min, RMSE: {rmse:.2f} min")

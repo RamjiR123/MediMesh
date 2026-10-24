@@ -204,8 +204,29 @@ async function initializeModels() {
   try {
     const response = await fetchJson('/predictive/init', { method: 'POST', body: JSON.stringify({}) });
     statusMessage('predictive-status', `Models initialized: ${response.message}`);
+    await loadTrainingSummary();
   } catch (error) {
     statusMessage('predictive-status', `Model init failed: ${error.message}`, true);
+  }
+}
+
+async function loadTrainingSummary() {
+  const container = document.getElementById('model-training-summary');
+  try {
+    const summary = await fetchJson('/predictive/training-summary');
+    const metrics = summary.er_wait_time_metrics;
+    const score = document.createElement('p');
+    score.textContent = `${metrics.target_source} labels | MAE ${metrics.mae.toFixed(1)} min | RMSE ${metrics.rmse.toFixed(1)} min`;
+    const list = document.createElement('ul');
+    list.className = 'feature-list';
+    metrics.feature_importance.slice(0, 5).forEach(item => {
+      const row = document.createElement('li');
+      row.textContent = `${item.feature.replaceAll('_', ' ')}: ${(item.importance * 100).toFixed(1)}%`;
+      list.append(row);
+    });
+    container.replaceChildren(score, list);
+  } catch (error) {
+    container.textContent = `Training summary unavailable: ${error.message}`;
   }
 }
 
@@ -213,6 +234,7 @@ async function reloadPredictiveStatus() {
   try {
     const status = await fetchJson('/predictive/status');
     document.getElementById('predictive-status').textContent = `Initialized: ${status.initialized}`;
+    if (status.initialized) await loadTrainingSummary();
   } catch (error) {
     statusMessage('predictive-status', `Unable to load status: ${error.message}`, true);
   }

@@ -44,6 +44,15 @@ class ERWaitPredictorTests(unittest.TestCase):
         predictor.train(sample_patients())
         self.assertEqual(predictor.train_metrics["target_source"], "synthetic")
 
+    def test_training_summary_ranks_feature_importance(self):
+        predictor = ERWaitTimePredictor()
+        predictor.train(sample_patients(observed=True))
+        importance = predictor.train_metrics["feature_importance"]
+        scores = [item["importance"] for item in importance]
+        self.assertEqual(len(importance), len(predictor.feature_columns))
+        self.assertEqual(scores, sorted(scores, reverse=True))
+        self.assertAlmostEqual(sum(scores), 1.0)
+
     def test_invalid_observed_labels_are_excluded(self):
         patients = sample_patients(observed=True)
         patients.loc[0, "wait_time_minutes"] = 0

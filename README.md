@@ -100,6 +100,22 @@ These checks validate internal consistency on controlled data; they are not an e
 
 The health metrics response includes warnings for bed occupancy at 90% or above, doctor availability at 10% or below, and 50 or more patient arrivals in the preceding 24 hours. Patient volume escalates to critical at 100 arrivals. These are initial demo settings, not hospital-specific safety standards; tune thresholds to local capacity and review alert frequency against observed operations.
 
+## ER Model Summary
+
+Initialize the predictive models to show ER training metrics and the five most important input features in the Predictive dashboard.
+
+Feature importance is a relative measure of how the random forest used an input when splitting training data. It is not evidence that a feature causes longer or shorter waits.
+
+MAE and RMSE describe error on the model's held-out split. The current sample data has no measured wait-time labels, so those scores are based on synthetic targets unless `wait_time_minutes` observations are supplied.
+
+Check the model-specific scenarios with:
+
+```powershell
+python -m unittest discover -s tests -p test_er_wait_predictor.py -v
+```
+
+Use real, representative wait-time observations and a time-based holdout before comparing model quality for operational use.
+
 ### Scenario Results
 | Scenario | Arrivals / hour | Estimated staff |
 | --- | ---: | ---: |

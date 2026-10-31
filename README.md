@@ -98,7 +98,15 @@ These checks validate internal consistency on controlled data; they are not an e
 
 ## Operational Alert Thresholds
 
-The health metrics response includes warnings for bed occupancy at 90% or above, doctor availability at 10% or below, and 50 or more patient arrivals in the preceding 24 hours. Patient volume escalates to critical at 100 arrivals. These are initial demo settings, not hospital-specific safety standards; tune thresholds to local capacity and review alert frequency against observed operations.
+The health metrics response includes warnings for bed occupancy at 90% or above, doctor availability at 10% or below, 50 or more patient arrivals in the preceding 24 hours, and 30 or more scheduled appointments in the next 24 hours. Patient and appointment volumes escalate to critical at 100 and 60, respectively. Only appointments still marked `scheduled` are counted; cancelled and completed appointments are excluded. These are initial demo settings, not hospital-specific safety standards; tune thresholds to local capacity and review alert frequency against observed operations.
+
+Run the alert boundary tests from the repository root:
+
+```powershell
+python -m unittest discover -s tests -p test_operational_alerts.py -v
+```
+
+The upcoming appointment window is measured from current UTC server time. Tests cover inclusive thresholds and combinations with other operational alerts.
 
 ## ER Model Summary
 

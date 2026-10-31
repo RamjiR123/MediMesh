@@ -2,6 +2,8 @@ BED_OCCUPANCY_ALERT_THRESHOLD = 90.0
 DOCTOR_AVAILABILITY_ALERT_THRESHOLD = 10.0
 RECENT_PATIENT_VOLUME_ALERT_THRESHOLD = 50
 RECENT_PATIENT_VOLUME_CRITICAL_THRESHOLD = 100
+UPCOMING_APPOINTMENT_ALERT_THRESHOLD = 30
+UPCOMING_APPOINTMENT_CRITICAL_THRESHOLD = 60
 
 
 def build_operational_alerts(metrics: dict) -> list[dict]:
@@ -33,5 +35,15 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "metric": "recent_patients_24h",
             "value": recent_patients,
             "message": f"Patient volume is {recent_patients} arrivals in the last 24 hours.",
+        })
+
+    upcoming_appointments = metrics.get("upcoming_appointments_24h", 0)
+    if upcoming_appointments >= UPCOMING_APPOINTMENT_ALERT_THRESHOLD:
+        level = "critical" if upcoming_appointments >= UPCOMING_APPOINTMENT_CRITICAL_THRESHOLD else "warning"
+        alerts.append({
+            "level": level,
+            "metric": "upcoming_appointments_24h",
+            "value": upcoming_appointments,
+            "message": f"{upcoming_appointments} appointments are scheduled in the next 24 hours.",
         })
     return alerts

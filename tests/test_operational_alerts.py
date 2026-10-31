@@ -70,6 +70,38 @@ class OperationalAlertsTests(unittest.TestCase):
         self.assertEqual(len(alerts), 3)
         self.assertEqual({alert["level"] for alert in alerts}, {"warning", "critical"})
 
+    def test_upcoming_appointment_threshold_is_inclusive(self):
+        alerts = build_operational_alerts({"upcoming_appointments_24h": 30})
+        self.assertEqual(alerts[0]["metric"], "upcoming_appointments_24h")
+        self.assertEqual(alerts[0]["level"], "warning")
+
+    def test_upcoming_appointment_below_threshold_does_not_alert(self):
+        self.assertEqual(build_operational_alerts({"upcoming_appointments_24h": 29}), [])
+
+    def test_upcoming_appointments_remain_warning_below_critical(self):
+        alerts = build_operational_alerts({"upcoming_appointments_24h": 59})
+        self.assertEqual(alerts[0]["level"], "warning")
+
+    def test_appointment_alert_escalates_to_critical(self):
+        alerts = build_operational_alerts({"upcoming_appointments_24h": 60})
+        self.assertEqual(alerts[0]["level"], "critical")
+        self.assertEqual(alerts[0]["value"], 60)
+
+    def test_zero_or_missing_appointments_do_not_alert(self):
+        self.assertEqual(build_operational_alerts({"upcoming_appointments_24h": 0}), [])
+        self.assertEqual(build_operational_alerts({}), [])
+
+    def test_appointment_alert_includes_current_count(self):
+        alert = build_operational_alerts({"upcoming_appointments_24h": 35})[0]
+        self.assertIn("35 appointments", alert["message"])
+
+    def test_appointment_and_patient_volume_alerts_coexist(self):
+        metrics = {"upcoming_appointments_24h": 30, "recent_patients_24h": 50}
+        alerts = build_operational_alerts(metrics)
+        self.assertEqual({alert["metric"] for alert in alerts}, {
+            "upcoming_appointments_24h", "recent_patients_24h",
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

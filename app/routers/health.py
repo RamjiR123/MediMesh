@@ -68,9 +68,14 @@ def system_metrics(db: Session = Depends(get_db)):
         doctor_availability_rate = (available_doctors / doctor_count * 100) if doctor_count > 0 else 0
 
         # Recent activity (last 24 hours)
-        yesterday = datetime.utcnow() - timedelta(days=1)
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
         recent_patients = db.query(models.Patient).filter(models.Patient.arrival_time >= yesterday).count()
         recent_appointments = db.query(models.Appointment).filter(models.Appointment.created_at >= yesterday).count()
+        upcoming_appointments = db.query(models.Appointment).filter(
+            models.Appointment.scheduled_time.between(now, now + timedelta(days=1)),
+            models.Appointment.status == "scheduled",
+        ).count()
 
         return {
             "status": "healthy",
@@ -84,13 +89,15 @@ def system_metrics(db: Session = Depends(get_db)):
                 "bed_occupancy_rate": round(bed_occupancy_rate, 2),
                 "doctor_availability_rate": round(doctor_availability_rate, 2),
                 "recent_patients_24h": recent_patients,
-                "recent_appointments_24h": recent_appointments
+                "recent_appointments_24h": recent_appointments,
+                "upcoming_appointments_24h": upcoming_appointments,
             },
             "alerts": build_operational_alerts({
                 "bed_occupancy_rate": round(bed_occupancy_rate, 2),
                 "total_doctors": doctor_count,
                 "doctor_availability_rate": round(doctor_availability_rate, 2),
                 "recent_patients_24h": recent_patients,
+                "upcoming_appointments_24h": upcoming_appointments,
             }),
             "timestamp": datetime.utcnow()
         }

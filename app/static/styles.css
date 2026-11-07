@@ -161,6 +161,8 @@ footer {
   border-left: 4px solid;
   padding: 12px 14px;
   background: #f8fafc;
+  border-radius: 8px;
+  line-height: 1.45;
 }
 
 .alert-item.critical {
@@ -178,6 +180,9 @@ footer {
 .alert-empty {
   margin-bottom: 0;
   color: #475569;
+  background: #f8fafc;
+  padding: 12px 14px;
+  border-radius: 8px;
 }
 
 .forecast-controls {

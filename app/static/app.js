@@ -32,12 +32,23 @@ function statusMessage(containerId, message, isError = false) {
   }
 }
 
+function formatMetricValue(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '0';
+  }
+  return Number(value).toLocaleString();
+}
+
+function getAlertTone(level) {
+  return level === 'critical' ? 'critical' : 'warning';
+}
+
 function renderOperationalAlerts(alerts = []) {
   const container = document.getElementById('overview-alerts');
   container.replaceChildren();
 
   const heading = document.createElement('h3');
-  heading.textContent = 'Operational Alerts';
+  heading.textContent = `Operational Alerts${alerts.length ? ` (${alerts.length})` : ''}`;
   container.append(heading);
 
   if (!alerts.length) {
@@ -52,8 +63,8 @@ function renderOperationalAlerts(alerts = []) {
   list.className = 'alert-items';
   alerts.forEach(alert => {
     const item = document.createElement('li');
-    item.className = `alert-item ${alert.level === 'critical' ? 'critical' : 'warning'}`;
-    item.textContent = alert.message;
+    item.className = `alert-item ${getAlertTone(alert.level)}`;
+    item.textContent = `${alert.message} (${formatMetricValue(alert.value)})`;
     list.append(item);
   });
   container.append(list);
@@ -65,11 +76,13 @@ async function loadOverview() {
     const overview = document.getElementById('overview-metrics');
     overview.innerHTML = `
       <h3>Live Count Metrics</h3>
-      <p><strong>Patients:</strong> ${metrics.metrics.total_patients}</p>
-      <p><strong>Doctors:</strong> ${metrics.metrics.total_doctors}</p>
-      <p><strong>Beds:</strong> ${metrics.metrics.total_beds}</p>
-      <p><strong>Occupied Beds:</strong> ${metrics.metrics.occupied_beds}/50 (${metrics.metrics.bed_occupancy_rate}% )</p>
-      <p><strong>Appointments:</strong> ${metrics.metrics.total_appointments}</p>
+      <p><strong>Patients:</strong> ${formatMetricValue(metrics.metrics.total_patients)}</p>
+      <p><strong>Doctors:</strong> ${formatMetricValue(metrics.metrics.total_doctors)}</p>
+      <p><strong>Beds:</strong> ${formatMetricValue(metrics.metrics.total_beds)}</p>
+      <p><strong>Occupied Beds:</strong> ${formatMetricValue(metrics.metrics.occupied_beds)}/${formatMetricValue(metrics.metrics.total_beds)} (${metrics.metrics.bed_occupancy_rate}%)</p>
+      <p><strong>Appointments:</strong> ${formatMetricValue(metrics.metrics.total_appointments)}</p>
+      <p><strong>Recent Patients (24h):</strong> ${formatMetricValue(metrics.metrics.recent_patients_24h)}</p>
+      <p><strong>Upcoming Appointments (24h):</strong> ${formatMetricValue(metrics.metrics.upcoming_appointments_24h)}</p>
       <p><strong>Doctor Availability:</strong> ${metrics.metrics.doctor_availability_rate}%</p>
     `;
     renderOperationalAlerts(metrics.alerts);

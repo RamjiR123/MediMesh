@@ -10,6 +10,14 @@ from app.operational_alerts import build_operational_alerts
 
 router = APIRouter(prefix="/health", tags=["Health Checks"])
 
+
+def _safe_percentage(numerator: int, denominator: int) -> float:
+    """Return a rounded percentage while guarding against divide-by-zero cases."""
+    if denominator <= 0:
+        return 0.0
+    return round((numerator / denominator) * 100, 2)
+
+
 @router.get("/")
 def health_check():
     """Basic health check endpoint"""
@@ -28,18 +36,19 @@ def database_health_check(db: Session = Depends(get_db)):
         db.commit()
 
         # Check if tables exist
-        tables_exist = all([
-            db.query(models.Patient).first() is not None or True,  # Allow empty tables
-            db.query(models.Doctor).first() is not None or True,
-            db.query(models.Bed).first() is not None or True,
-            db.query(models.Appointment).first() is not None or True,
-            db.query(models.Staff).first() is not None or True,
-        ])
+        table_status = {
+            "patients": db.query(models.Patient).first() is not None or True,
+            "doctors": db.query(models.Doctor).first() is not None or True,
+            "beds": db.query(models.Bed).first() is not None or True,
+            "appointments": db.query(models.Appointment).first() is not None or True,
+            "staff": db.query(models.Staff).first() is not None or True,
+        }
 
         return {
             "status": "healthy",
             "database": "connected",
-            "tables_exist": tables_exist,
+            "tables_exist": all(table_status.values()),
+            "table_status": table_status,
             "timestamp": datetime.utcnow()
         }
     except Exception as e:
@@ -62,10 +71,10 @@ def system_metrics(db: Session = Depends(get_db)):
 
         # Calculate occupancy rates
         occupied_beds = db.query(models.Bed).filter(models.Bed.is_occupied == True).count()
-        bed_occupancy_rate = (occupied_beds / bed_count * 100) if bed_count > 0 else 0
+        bed_occupancy_rate = _safe_percentage(occupied_beds, bed_count)
 
         available_doctors = db.query(models.Doctor).filter(models.Doctor.is_available == True).count()
-        doctor_availability_rate = (available_doctors / doctor_count * 100) if doctor_count > 0 else 0
+        doctor_availability_rate = _safe_percentage(available_doctors, doctor_count)
 
         # Recent activity (last 24 hours)
         now = datetime.utcnow()
@@ -77,21 +86,23 @@ def system_metrics(db: Session = Depends(get_db)):
             models.Appointment.status == "scheduled",
         ).count()
 
+        metric_snapshot = {
+            "total_patients": patient_count,
+            "total_doctors": doctor_count,
+            "total_beds": bed_count,
+            "occupied_beds": occupied_beds,
+            "total_appointments": appointment_count,
+            "total_staff": staff_count,
+            "bed_occupancy_rate": round(bed_occupancy_rate, 2),
+            "doctor_availability_rate": round(doctor_availability_rate, 2),
+            "recent_patients_24h": recent_patients,
+            "recent_appointments_24h": recent_appointments,
+            "upcoming_appointments_24h": upcoming_appointments,
+        }
+
         return {
             "status": "healthy",
-            "metrics": {
-                "total_patients": patient_count,
-                "total_doctors": doctor_count,
-                "total_beds": bed_count,
-                "occupied_beds": occupied_beds,
-                "total_appointments": appointment_count,
-                "total_staff": staff_count,
-                "bed_occupancy_rate": round(bed_occupancy_rate, 2),
-                "doctor_availability_rate": round(doctor_availability_rate, 2),
-                "recent_patients_24h": recent_patients,
-                "recent_appointments_24h": recent_appointments,
-                "upcoming_appointments_24h": upcoming_appointments,
-            },
+            "metrics": metric_snapshot,
             "alerts": build_operational_alerts({
                 "bed_occupancy_rate": round(bed_occupancy_rate, 2),
                 "total_doctors": doctor_count,

@@ -6,9 +6,19 @@ UPCOMING_APPOINTMENT_ALERT_THRESHOLD = 30
 UPCOMING_APPOINTMENT_CRITICAL_THRESHOLD = 60
 
 
+def _safe_float(value, default=0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if number != number or number in (float("inf"), float("-inf")):
+        return default
+    return number
+
+
 def build_operational_alerts(metrics: dict) -> list[dict]:
     alerts = []
-    occupancy = metrics.get("bed_occupancy_rate", 0)
+    occupancy = _safe_float(metrics.get("bed_occupancy_rate", 0), 0)
     if occupancy >= BED_OCCUPANCY_ALERT_THRESHOLD:
         alerts.append({
             "level": "critical",
@@ -17,8 +27,8 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "message": f"Bed occupancy is {occupancy:.1f}%, at or above the 90% threshold.",
         })
 
-    total_doctors = metrics.get("total_doctors", 0)
-    availability = metrics.get("doctor_availability_rate", 100)
+    total_doctors = _safe_float(metrics.get("total_doctors", 0), 0)
+    availability = _safe_float(metrics.get("doctor_availability_rate", 100), 100)
     if total_doctors and availability <= DOCTOR_AVAILABILITY_ALERT_THRESHOLD:
         alerts.append({
             "level": "warning",
@@ -27,7 +37,7 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "message": f"Doctor availability is {availability:.1f}%, at or below the 10% threshold.",
         })
 
-    recent_patients = metrics.get("recent_patients_24h", 0)
+    recent_patients = int(_safe_float(metrics.get("recent_patients_24h", 0), 0))
     if recent_patients >= RECENT_PATIENT_VOLUME_ALERT_THRESHOLD:
         level = "critical" if recent_patients >= RECENT_PATIENT_VOLUME_CRITICAL_THRESHOLD else "warning"
         alerts.append({
@@ -37,7 +47,7 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "message": f"Patient volume is {recent_patients} arrivals in the last 24 hours.",
         })
 
-    upcoming_appointments = metrics.get("upcoming_appointments_24h", 0)
+    upcoming_appointments = int(_safe_float(metrics.get("upcoming_appointments_24h", 0), 0))
     if upcoming_appointments >= UPCOMING_APPOINTMENT_ALERT_THRESHOLD:
         level = "critical" if upcoming_appointments >= UPCOMING_APPOINTMENT_CRITICAL_THRESHOLD else "warning"
         alerts.append({

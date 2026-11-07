@@ -60,6 +60,26 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["upcoming_appointments_24h"], 0)
         self.assertEqual(result["alerts"], [])
 
+    def test_metrics_handle_missing_values_without_crashing(self):
+        result = system_metrics(self.session)
+        self.assertEqual(result["metrics"]["bed_occupancy_rate"], 0)
+        self.assertEqual(result["metrics"]["doctor_availability_rate"], 0)
+        self.assertEqual(result["metrics"]["recent_patients_24h"], 0)
+        self.assertEqual(result["metrics"]["upcoming_appointments_24h"], 0)
+        self.assertEqual(result["alerts"], [])
+
+    def test_alert_builder_rejects_invalid_numeric_inputs(self):
+        from app.operational_alerts import build_operational_alerts
+
+        alerts = build_operational_alerts({
+            "bed_occupancy_rate": None,
+            "total_doctors": 0,
+            "doctor_availability_rate": "not-a-number",
+            "recent_patients_24h": "bad",
+            "upcoming_appointments_24h": float("nan"),
+        })
+        self.assertEqual(alerts, [])
+
 
 if __name__ == "__main__":
     unittest.main()

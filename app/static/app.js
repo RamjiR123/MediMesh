@@ -43,12 +43,22 @@ function getAlertTone(level) {
   return level === 'critical' ? 'critical' : 'warning';
 }
 
+function summarizeActiveAlerts(alerts = []) {
+  const summary = { total: alerts.length, critical: 0, warning: 0 };
+  alerts.forEach(alert => {
+    const key = alert.level === 'critical' ? 'critical' : 'warning';
+    summary[key] += 1;
+  });
+  return summary;
+}
+
 function renderOperationalAlerts(alerts = []) {
   const container = document.getElementById('overview-alerts');
   container.replaceChildren();
 
   const heading = document.createElement('h3');
-  heading.textContent = `Operational Alerts${alerts.length ? ` (${alerts.length})` : ''}`;
+  const summary = summarizeActiveAlerts(alerts);
+  heading.textContent = `Operational Alerts${summary.total ? ` (${summary.total})` : ''}`;
   container.append(heading);
 
   if (!alerts.length) {
@@ -58,6 +68,11 @@ function renderOperationalAlerts(alerts = []) {
     container.append(message);
     return;
   }
+
+  const note = document.createElement('p');
+  note.className = 'alert-summary';
+  note.textContent = `${summary.critical} critical • ${summary.warning} warning`;
+  container.append(note);
 
   const list = document.createElement('ul');
   list.className = 'alert-items';

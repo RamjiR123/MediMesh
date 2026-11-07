@@ -149,6 +149,13 @@ footer {
   margin-top: 0;
 }
 
+.alert-summary {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+
 .alert-items {
   display: grid;
   gap: 10px;

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from datetime import datetime, timedelta
 import psycopg2
 import os
@@ -9,6 +9,7 @@ from app import models
 from app.operational_alerts import build_operational_alerts
 
 router = APIRouter(prefix="/health", tags=["Health Checks"])
+REQUIRED_TABLES = ("patients", "doctors", "beds", "appointments", "staff")
 
 
 def _safe_percentage(numerator: int, denominator: int) -> float:
@@ -16,6 +17,11 @@ def _safe_percentage(numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
     return round((numerator / denominator) * 100, 2)
+
+
+def _get_table_status(db: Session) -> dict[str, bool]:
+    existing_tables = set(inspect(db.get_bind()).get_table_names())
+    return {table: table in existing_tables for table in REQUIRED_TABLES}
 
 
 @router.get("/")
@@ -35,19 +41,13 @@ def database_health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         db.commit()
 
-        # Check if tables exist
-        table_status = {
-            "patients": db.query(models.Patient).first() is not None or True,
-            "doctors": db.query(models.Doctor).first() is not None or True,
-            "beds": db.query(models.Bed).first() is not None or True,
-            "appointments": db.query(models.Appointment).first() is not None or True,
-            "staff": db.query(models.Staff).first() is not None or True,
-        }
+        table_status = _get_table_status(db)
+        tables_exist = all(table_status.values())
 
         return {
-            "status": "healthy",
+            "status": "healthy" if tables_exist else "unhealthy",
             "database": "connected",
-            "tables_exist": all(table_status.values()),
+            "tables_exist": tables_exist,
             "table_status": table_status,
             "timestamp": datetime.utcnow()
         }
@@ -127,11 +127,8 @@ def readiness_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
 
         # Check if critical tables exist
-        inspector = db.get_bind().engine
-        tables = inspector.get_table_names()
-
-        required_tables = ["patients", "doctors", "beds", "appointments", "staff"]
-        missing_tables = [table for table in required_tables if table not in tables]
+        table_status = _get_table_status(db)
+        missing_tables = [table for table, exists in table_status.items() if not exists]
 
         if missing_tables:
             return {

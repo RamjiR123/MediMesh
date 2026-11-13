@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.routers.health import system_metrics
+from app.routers.health import database_health_check, readiness_check, system_metrics
 
 
 class HealthAppointmentMetricsTests(unittest.TestCase):
@@ -29,6 +29,36 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
             for appointment_id, status, offset in rows
         ])
         self.session.commit()
+
+    def test_database_health_reports_existing_tables(self):
+        result = database_health_check(self.session)
+        self.assertEqual(result["status"], "healthy")
+        self.assertTrue(result["tables_exist"])
+        self.assertTrue(all(result["table_status"].values()))
+
+    def test_database_health_reports_missing_tables(self):
+        models.Base.metadata.drop_all(bind=self.engine)
+        result = database_health_check(self.session)
+        self.assertEqual(result["status"], "unhealthy")
+        self.assertFalse(result["tables_exist"])
+        self.assertFalse(any(result["table_status"].values()))
+
+    def test_database_health_identifies_each_missing_table(self):
+        required_tables = ("patients", "doctors", "beds", "appointments", "staff")
+        for table in required_tables:
+            with self.subTest(table=table):
+                models.Base.metadata.drop_all(bind=self.engine)
+                models.Base.metadata.create_all(bind=self.engine)
+                models.Base.metadata.tables[table].drop(bind=self.engine)
+                result = database_health_check(self.session)
+                self.assertFalse(result["table_status"][table])
+
+    def test_readiness_reports_required_table_state(self):
+        self.assertEqual(readiness_check(self.session)["status"], "ready")
+        models.Base.metadata.tables["beds"].drop(bind=self.engine)
+        result = readiness_check(self.session)
+        self.assertEqual(result["status"], "not ready")
+        self.assertIn("beds", result["reason"])
 
     def test_metrics_only_count_scheduled_appointments_in_next_day(self):
         self.add_appointments([

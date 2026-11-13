@@ -97,6 +97,7 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["recent_patients_24h"], 0)
         self.assertEqual(result["metrics"]["upcoming_appointments_24h"], 0)
         self.assertEqual(result["metrics"]["bed_occupancy_by_department"], [])
+        self.assertEqual(result["metrics"]["doctor_availability_by_department"], [])
         self.assertEqual(result["alerts"], [])
 
     def test_metrics_include_department_bed_occupancy(self):
@@ -138,6 +139,22 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
                 },
             ],
         )
+
+    def test_metrics_include_department_doctor_availability(self):
+        self.session.add_all([
+            models.Doctor(doctor_id="D-1", name="A", department="Cardiology", is_available=True),
+            models.Doctor(doctor_id="D-2", name="B", department="Cardiology", is_available=False),
+            models.Doctor(doctor_id="D-3", name="C", department="ICU", is_available=False),
+        ])
+        self.session.commit()
+
+        result = system_metrics(self.session)
+
+        departments = result["metrics"]["doctor_availability_by_department"]
+        self.assertEqual([row["department"] for row in departments], ["Cardiology", "ICU"])
+        self.assertEqual([row["total_doctors"] for row in departments], [2, 1])
+        self.assertEqual([row["available_doctors"] for row in departments], [1, 0])
+        self.assertEqual([row["availability_rate"] for row in departments], [50.0, 0.0])
 
     def test_alert_builder_rejects_invalid_numeric_inputs(self):
         from app.operational_alerts import build_operational_alerts

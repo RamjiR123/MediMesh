@@ -48,6 +48,30 @@ def _bed_occupancy_by_department(db: Session):
     ]
 
 
+def _doctor_availability_by_department(db: Session):
+    rows = (
+        db.query(
+            models.Doctor.department,
+            func.count(models.Doctor.id).label("total_doctors"),
+            func.sum(case(
+                (models.Doctor.is_available.is_(True), 1), else_=0
+            )).label("available_doctors"),
+        )
+        .group_by(models.Doctor.department)
+        .order_by(models.Doctor.department)
+        .all()
+    )
+    return [
+        {
+            "department": department or "Unassigned",
+            "total_doctors": total,
+            "available_doctors": available,
+            "availability_rate": _safe_percentage(available, total),
+        }
+        for department, total, available in rows
+    ]
+
+
 @router.get("/")
 def health_check():
     """Basic health check endpoint"""
@@ -116,6 +140,7 @@ def system_metrics(db: Session = Depends(get_db)):
             "total_beds": bed_count,
             "occupied_beds": occupied_beds,
             "bed_occupancy_by_department": _bed_occupancy_by_department(db),
+            "doctor_availability_by_department": _doctor_availability_by_department(db),
             "total_appointments": appointment_count,
             "total_staff": staff_count,
             "bed_occupancy_rate": round(bed_occupancy_rate, 2),

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import inspect, text
+from sqlalchemy import case, func, inspect, text
 from datetime import datetime, timedelta
 import psycopg2
 import os
@@ -22,6 +22,30 @@ def _safe_percentage(numerator: int, denominator: int) -> float:
 def _get_table_status(db: Session) -> dict[str, bool]:
     existing_tables = set(inspect(db.get_bind()).get_table_names())
     return {table: table in existing_tables for table in REQUIRED_TABLES}
+
+
+def _bed_occupancy_by_department(db: Session):
+    rows = (
+        db.query(
+            models.Bed.department,
+            func.count(models.Bed.id).label("total_beds"),
+            func.sum(
+                case((models.Bed.is_occupied.is_(True), 1), else_=0)
+            ).label("occupied_beds"),
+        )
+        .group_by(models.Bed.department)
+        .order_by(models.Bed.department)
+        .all()
+    )
+    return [
+        {
+            "department": department or "Unassigned",
+            "total_beds": total_beds,
+            "occupied_beds": occupied_beds,
+            "occupancy_rate": _safe_percentage(occupied_beds, total_beds),
+        }
+        for department, total_beds, occupied_beds in rows
+    ]
 
 
 @router.get("/")
@@ -91,6 +115,7 @@ def system_metrics(db: Session = Depends(get_db)):
             "total_doctors": doctor_count,
             "total_beds": bed_count,
             "occupied_beds": occupied_beds,
+            "bed_occupancy_by_department": _bed_occupancy_by_department(db),
             "total_appointments": appointment_count,
             "total_staff": staff_count,
             "bed_occupancy_rate": round(bed_occupancy_rate, 2),

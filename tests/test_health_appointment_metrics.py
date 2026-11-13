@@ -96,7 +96,48 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["doctor_availability_rate"], 0)
         self.assertEqual(result["metrics"]["recent_patients_24h"], 0)
         self.assertEqual(result["metrics"]["upcoming_appointments_24h"], 0)
+        self.assertEqual(result["metrics"]["bed_occupancy_by_department"], [])
         self.assertEqual(result["alerts"], [])
+
+    def test_metrics_include_department_bed_occupancy(self):
+        self.session.add_all([
+            models.Bed(
+                bed_number="C-1",
+                department="Cardiology",
+                is_occupied=True,
+            ),
+            models.Bed(
+                bed_number="C-2",
+                department="Cardiology",
+                is_occupied=False,
+            ),
+            models.Bed(
+                bed_number="I-1",
+                department="ICU",
+                is_occupied=True,
+            ),
+        ])
+        self.session.commit()
+
+        result = system_metrics(self.session)
+
+        self.assertEqual(
+            result["metrics"]["bed_occupancy_by_department"],
+            [
+                {
+                    "department": "Cardiology",
+                    "total_beds": 2,
+                    "occupied_beds": 1,
+                    "occupancy_rate": 50.0,
+                },
+                {
+                    "department": "ICU",
+                    "total_beds": 1,
+                    "occupied_beds": 1,
+                    "occupancy_rate": 100.0,
+                },
+            ],
+        )
 
     def test_alert_builder_rejects_invalid_numeric_inputs(self):
         from app.operational_alerts import build_operational_alerts

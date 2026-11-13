@@ -96,6 +96,10 @@ The hospital scenarios use fixed synthetic arrivals on matching weekdays. They c
 
 These checks validate internal consistency on controlled data; they are not an estimate of real hospital accuracy. Current patient records do not include measured wait times, so ER wait-model evaluation uses synthetic fallback labels until observed `wait_time_minutes` data is available. Staffing estimates also depend on the configured patients-per-staff ratio and should not be used as clinical or shift-roster guidance.
 
+## Health Metrics
+
+`/health/database` verifies that the patients, doctors, beds, appointments, and staff tables exist, while `/health/readiness` reports `not ready` if any are missing. `/health/metrics` includes per-department bed totals, occupied counts, and occupancy rates, plus doctor totals, available counts, and availability rates. Records without a department are grouped under `Unassigned`.
+
 ## Operational Alert Thresholds
 
 The health metrics response includes warnings for bed occupancy at 90% or above, doctor availability at 10% or below, 50 or more patient arrivals in the preceding 24 hours, and 30 or more scheduled appointments in the next 24 hours. Patient and appointment volumes escalate to critical at 100 and 60, respectively. Only appointments still marked `scheduled` are counted; cancelled and completed appointments are excluded. These are initial demo settings, not hospital-specific safety standards; tune thresholds to local capacity and review alert frequency against observed operations.

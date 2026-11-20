@@ -82,6 +82,31 @@ def _acuity_label(level: int) -> str:
     return "High"
 
 
+def _staff_coverage_by_department(db: Session):
+    rows = (
+        db.query(
+            models.Staff.department,
+            func.count(models.Staff.id).label("total_staff"),
+            func.sum(case(
+                (models.Staff.is_active.is_(True), 1), else_=0
+            )).label("active_staff"),
+        )
+        .group_by(models.Staff.department)
+        .order_by(models.Staff.department)
+        .all()
+    )
+    return [
+        {
+            "department": department or "Unassigned",
+            "total_staff": total,
+            "active_staff": active,
+            "inactive_staff": total - active,
+            "coverage_rate": _safe_percentage(active, total),
+        }
+        for department, total, active in rows
+    ]
+
+
 def _patient_acuity_distribution(db: Session):
     rows = (
         db.query(models.Patient.acuity_level, func.count(models.Patient.id))
@@ -168,6 +193,7 @@ def system_metrics(db: Session = Depends(get_db)):
             "occupied_beds": occupied_beds,
             "bed_occupancy_by_department": _bed_occupancy_by_department(db),
             "doctor_availability_by_department": _doctor_availability_by_department(db),
+            "staff_coverage_by_department": _staff_coverage_by_department(db),
             "patient_acuity_distribution": _patient_acuity_distribution(db),
             "total_appointments": appointment_count,
             "total_staff": staff_count,

@@ -98,6 +98,7 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["upcoming_appointments_24h"], 0)
         self.assertEqual(result["metrics"]["bed_occupancy_by_department"], [])
         self.assertEqual(result["metrics"]["doctor_availability_by_department"], [])
+        self.assertEqual(result["metrics"]["patient_acuity_distribution"], [])
         self.assertEqual(result["alerts"], [])
 
     def test_metrics_include_department_bed_occupancy(self):
@@ -155,6 +156,24 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual([row["total_doctors"] for row in departments], [2, 1])
         self.assertEqual([row["available_doctors"] for row in departments], [1, 0])
         self.assertEqual([row["availability_rate"] for row in departments], [50.0, 0.0])
+
+    def test_metrics_include_patient_acuity_distribution(self):
+        self.session.add_all([
+            models.Patient(patient_id=101, acuity_level=1),
+            models.Patient(patient_id=102, acuity_level=1),
+            models.Patient(patient_id=103, acuity_level=3),
+            models.Patient(patient_id=104, acuity_level=None),
+        ])
+        self.session.commit()
+
+        result = system_metrics(self.session)
+
+        distribution = result["metrics"]["patient_acuity_distribution"]
+        self.assertEqual(distribution, [
+            {"acuity_level": 0, "acuity_label": "Unknown", "patient_count": 1},
+            {"acuity_level": 1, "acuity_label": "Low", "patient_count": 2},
+            {"acuity_level": 3, "acuity_label": "Medium", "patient_count": 1},
+        ])
 
     def test_alert_builder_rejects_invalid_numeric_inputs(self):
         from app.operational_alerts import build_operational_alerts

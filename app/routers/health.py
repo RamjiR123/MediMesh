@@ -72,6 +72,33 @@ def _doctor_availability_by_department(db: Session):
     ]
 
 
+def _acuity_label(level: int) -> str:
+    if level <= 0:
+        return "Unknown"
+    if level <= 2:
+        return "Low"
+    if level <= 4:
+        return "Medium"
+    return "High"
+
+
+def _patient_acuity_distribution(db: Session):
+    rows = (
+        db.query(models.Patient.acuity_level, func.count(models.Patient.id))
+        .group_by(models.Patient.acuity_level)
+        .order_by(models.Patient.acuity_level)
+        .all()
+    )
+    return [
+        {
+            "acuity_level": level if level is not None else 0,
+            "acuity_label": _acuity_label(level if level is not None else 0),
+            "patient_count": count,
+        }
+        for level, count in rows
+    ]
+
+
 @router.get("/")
 def health_check():
     """Basic health check endpoint"""
@@ -141,6 +168,7 @@ def system_metrics(db: Session = Depends(get_db)):
             "occupied_beds": occupied_beds,
             "bed_occupancy_by_department": _bed_occupancy_by_department(db),
             "doctor_availability_by_department": _doctor_availability_by_department(db),
+            "patient_acuity_distribution": _patient_acuity_distribution(db),
             "total_appointments": appointment_count,
             "total_staff": staff_count,
             "bed_occupancy_rate": round(bed_occupancy_rate, 2),

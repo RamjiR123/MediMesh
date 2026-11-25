@@ -149,6 +149,18 @@ footer {
   margin-top: 0;
 }
 
+.department-metrics-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.department-metrics {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .alert-summary {
   margin: 0 0 10px;
   font-size: 0.82rem;

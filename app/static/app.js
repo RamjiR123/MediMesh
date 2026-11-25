@@ -43,6 +43,28 @@ function getAlertTone(level) {
   return level === 'critical' ? 'critical' : 'warning';
 }
 
+function renderDepartmentMetric(container, title, items, valueKey) {
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+  container.append(heading);
+
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No department data available';
+    container.append(empty);
+    return;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'department-metrics';
+  items.forEach(item => {
+    const row = document.createElement('li');
+    row.textContent = `${item.department}: ${formatMetricValue(item[valueKey])}`;
+    list.append(row);
+  });
+  container.append(list);
+}
+
 function summarizeActiveAlerts(alerts = []) {
   const summary = { total: alerts.length, critical: 0, warning: 0 };
   alerts.forEach(alert => {
@@ -100,6 +122,23 @@ async function loadOverview() {
       <p><strong>Upcoming Appointments (24h):</strong> ${formatMetricValue(metrics.metrics.upcoming_appointments_24h)}</p>
       <p><strong>Doctor Availability:</strong> ${metrics.metrics.doctor_availability_rate}%</p>
     `;
+
+    const departmentContainer = document.createElement('div');
+    departmentContainer.className = 'department-metrics-panel';
+    renderDepartmentMetric(departmentContainer, 'Bed Occupancy by Department',
+      metrics.metrics.bed_occupancy_by_department || [], 'occupancy_rate');
+    renderDepartmentMetric(departmentContainer, 'Doctor Availability by Department',
+      metrics.metrics.doctor_availability_by_department || [], 'availability_rate');
+    renderDepartmentMetric(departmentContainer, 'Staff Coverage by Department',
+      metrics.metrics.staff_coverage_by_department || [], 'coverage_rate');
+
+    const acuity = metrics.metrics.patient_acuity_distribution || [];
+    renderDepartmentMetric(departmentContainer, 'Patient Acuity', acuity.map(item => ({
+      department: item.acuity_label,
+      coverage_rate: item.patient_count,
+    })), 'coverage_rate');
+
+    overview.append(departmentContainer);
     renderOperationalAlerts(metrics.alerts);
   } catch (error) {
     document.getElementById('overview-metrics').textContent = `Unable to load metrics: ${error.message}`;

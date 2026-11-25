@@ -1,9 +1,64 @@
 import unittest
 
-from app.operational_alerts import build_operational_alerts
+from app.operational_alerts import build_operational_alerts, sort_alerts, summarize_alerts
 
 
 class OperationalAlertsTests(unittest.TestCase):
+    def test_sort_alerts_prioritizes_critical_before_warning(self):
+        alerts = [
+            {"level": "warning", "metric": "recent_patients_24h"},
+            {"level": "critical", "metric": "bed_occupancy_rate"},
+            {"level": "warning", "metric": "doctor_availability_rate"},
+        ]
+        ordered = sort_alerts(alerts)
+        self.assertEqual([alert["metric"] for alert in ordered], [
+            "bed_occupancy_rate",
+            "doctor_availability_rate",
+            "recent_patients_24h",
+        ])
+
+    def test_sort_alerts_uses_metric_name_as_tie_breaker(self):
+        alerts = [
+            {"level": "critical", "metric": "z_metric"},
+            {"level": "critical", "metric": "a_metric"},
+        ]
+        self.assertEqual(
+            [alert["metric"] for alert in sort_alerts(alerts)],
+            ["a_metric", "z_metric"],
+        )
+
+    def test_sort_alerts_ignores_non_dictionary_entries(self):
+        alerts = [{"level": "warning", "metric": "patient_volume"}, None, "invalid"]
+        self.assertEqual(sort_alerts(alerts), [alerts[0]])
+
+    def test_sort_alerts_handles_unknown_levels_last(self):
+        alerts = [
+            {"level": "info", "metric": "status"},
+            {"level": "warning", "metric": "volume"},
+        ]
+        self.assertEqual([alert["level"] for alert in sort_alerts(alerts)], ["warning", "info"])
+
+    def test_summarize_alerts_counts_all_severity_levels(self):
+        alerts = [
+            {"level": "critical"},
+            {"level": "warning"},
+            {"level": "warning"},
+        ]
+        self.assertEqual(summarize_alerts(alerts), {
+            "total": 3,
+            "warning": 2,
+            "critical": 1,
+        })
+
+    def test_build_operational_alerts_returns_sorted_output(self):
+        alerts = build_operational_alerts({
+            "bed_occupancy_rate": 95,
+            "recent_patients_24h": 50,
+            "upcoming_appointments_24h": 30,
+        })
+        levels = [alert["level"] for alert in alerts]
+        self.assertEqual(levels, ["critical", "warning", "warning"])
+
     def test_healthy_metrics_return_no_alerts(self):
         metrics = {"bed_occupancy_rate": 89.99, "total_doctors": 10, "doctor_availability_rate": 10.01}
         self.assertEqual(build_operational_alerts(metrics), [])

@@ -40,6 +40,17 @@ def summarize_alerts(alerts: list[dict]) -> dict:
     return summary
 
 
+def sort_alerts(alerts: list[dict]) -> list[dict]:
+    severity_order = {"critical": 0, "warning": 1}
+    return sorted(
+        [alert for alert in alerts if isinstance(alert, dict)],
+        key=lambda alert: (
+            severity_order.get(alert.get("level"), 2),
+            str(alert.get("metric", "")),
+        ),
+    )
+
+
 def build_operational_alerts(metrics: dict) -> list[dict]:
     alerts = []
     normalized = normalize_alert_metrics(metrics)
@@ -81,4 +92,4 @@ def build_operational_alerts(metrics: dict) -> list[dict]:
             "value": upcoming_appointments,
             "message": f"{upcoming_appointments} appointments are scheduled in the next 24 hours.",
         })
-    return alerts
+    return sort_alerts(alerts)

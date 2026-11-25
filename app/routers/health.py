@@ -107,6 +107,45 @@ def _staff_coverage_by_department(db: Session):
     ]
 
 
+def _patient_department_distribution(db: Session):
+    rows = (
+        db.query(models.Patient.department, func.count(models.Patient.id))
+        .group_by(models.Patient.department)
+        .all()
+    )
+    distribution = [
+        {"department": department or "Unassigned", "patient_count": count}
+        for department, count in rows
+    ]
+    return sorted(distribution, key=lambda item: (item["department"] == "Unassigned", item["department"]))
+
+
+def _staff_role_distribution(db: Session):
+    rows = (
+        db.query(models.Staff.role, func.count(models.Staff.id))
+        .group_by(models.Staff.role)
+        .order_by(models.Staff.role)
+        .all()
+    )
+    return [
+        {"role": role or "Unassigned", "staff_count": count}
+        for role, count in rows
+    ]
+
+
+def _appointment_status_distribution(db: Session):
+    rows = (
+        db.query(models.Appointment.status, func.count(models.Appointment.id))
+        .group_by(models.Appointment.status)
+        .order_by(models.Appointment.status)
+        .all()
+    )
+    return [
+        {"status": status or "Unknown", "appointment_count": count}
+        for status, count in rows
+    ]
+
+
 def _patient_acuity_distribution(db: Session):
     rows = (
         db.query(models.Patient.acuity_level, func.count(models.Patient.id))
@@ -194,6 +233,9 @@ def system_metrics(db: Session = Depends(get_db)):
             "bed_occupancy_by_department": _bed_occupancy_by_department(db),
             "doctor_availability_by_department": _doctor_availability_by_department(db),
             "staff_coverage_by_department": _staff_coverage_by_department(db),
+            "patient_department_distribution": _patient_department_distribution(db),
+            "staff_role_distribution": _staff_role_distribution(db),
+            "appointment_status_distribution": _appointment_status_distribution(db),
             "patient_acuity_distribution": _patient_acuity_distribution(db),
             "total_appointments": appointment_count,
             "total_staff": staff_count,

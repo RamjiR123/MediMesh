@@ -99,6 +99,9 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["bed_occupancy_by_department"], [])
         self.assertEqual(result["metrics"]["doctor_availability_by_department"], [])
         self.assertEqual(result["metrics"]["staff_coverage_by_department"], [])
+        self.assertEqual(result["metrics"]["patient_department_distribution"], [])
+        self.assertEqual(result["metrics"]["staff_role_distribution"], [])
+        self.assertEqual(result["metrics"]["appointment_status_distribution"], [])
         self.assertEqual(result["metrics"]["patient_acuity_distribution"], [])
         self.assertEqual(result["alerts"], [])
 
@@ -174,6 +177,60 @@ class HealthAppointmentMetricsTests(unittest.TestCase):
         self.assertEqual([row["active_staff"] for row in departments], [1, 1])
         self.assertEqual([row["inactive_staff"] for row in departments], [1, 0])
         self.assertEqual([row["coverage_rate"] for row in departments], [50.0, 100.0])
+
+    def test_metrics_include_patient_department_distribution(self):
+        self.session.add_all([
+            models.Patient(patient_id=201, department="ER"),
+            models.Patient(patient_id=202, department="ER"),
+            models.Patient(patient_id=203, department="ICU"),
+            models.Patient(patient_id=204, department=None),
+        ])
+        self.session.commit()
+
+        distribution = system_metrics(self.session)["metrics"]["patient_department_distribution"]
+        self.assertEqual(distribution, [
+            {"department": "ER", "patient_count": 2},
+            {"department": "ICU", "patient_count": 1},
+            {"department": "Unassigned", "patient_count": 1},
+        ])
+
+    def test_metrics_include_staff_role_distribution(self):
+        self.session.add_all([
+            models.Staff(staff_id="R-1", name="Nurse A", role="Nurse"),
+            models.Staff(staff_id="R-2", name="Nurse B", role="Nurse"),
+            models.Staff(staff_id="R-3", name="Tech A", role="Technician"),
+        ])
+        self.session.commit()
+
+        distribution = system_metrics(self.session)["metrics"]["staff_role_distribution"]
+        self.assertEqual(distribution, [
+            {"role": "Nurse", "staff_count": 2},
+            {"role": "Technician", "staff_count": 1},
+        ])
+
+    def test_metrics_include_appointment_status_distribution(self):
+        now = datetime.utcnow()
+        self.session.add_all([
+            models.Appointment(appointment_id="S-1", status="scheduled", scheduled_time=now),
+            models.Appointment(appointment_id="S-2", status="scheduled", scheduled_time=now),
+            models.Appointment(appointment_id="C-1", status="completed", scheduled_time=now),
+        ])
+        self.session.commit()
+
+        distribution = system_metrics(self.session)["metrics"]["appointment_status_distribution"]
+        self.assertEqual(distribution, [
+            {"status": "completed", "appointment_count": 1},
+            {"status": "scheduled", "appointment_count": 2},
+        ])
+
+    def test_unassigned_staff_role_is_labeled(self):
+        self.session.add(models.Staff(staff_id="R-4", name="Unknown Role", role=None))
+        self.session.commit()
+
+        distribution = system_metrics(self.session)["metrics"]["staff_role_distribution"]
+        self.assertEqual(len(distribution), 1)
+        self.assertEqual(distribution[0]["role"], "Unassigned")
+        self.assertEqual(distribution[0]["staff_count"], 1)
 
     def test_metrics_include_patient_acuity_distribution(self):
         self.session.add_all([
